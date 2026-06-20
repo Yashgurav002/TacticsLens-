@@ -181,7 +181,8 @@ The app ships as a single Docker container — FastAPI serves both the API and t
 ## About
 
 Built by **Yash Gurav** — AI/ML engineer focused on practical RAG systems, not toy demos.
-🐦 X/Twitter: [@yash_gurav_2002](https://x.com/yash_gurav_2002)
+
+-🐦 X/Twitter: [@yash_gurav_2002](https://x.com/yash_gurav_2002)
 - 💼 LinkedIn: [yash-gurav](https://www.linkedin.com/in/yash-gurav-58bbba21a/)
 
 ---
