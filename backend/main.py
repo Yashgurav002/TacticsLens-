@@ -49,6 +49,7 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     question: str
     match_context: str | None = None
+    match_id: str | None = None
     history: list[dict] | None = []
 
 
@@ -71,7 +72,6 @@ def health():
 
 @app.get("/matches")
 def get_matches():
-    """Hardcoded match list — same 3 matches that are ingested in ChromaDB."""
     matches = [
         {
             "match_id": 303731,
@@ -103,9 +103,30 @@ def get_matches():
             "competition": "La Liga",
             "season": "2019/2020",
         },
+        {
+            "match_id": 3869685,
+            "home_team": "Argentina",
+            "away_team": "France",
+            "home_score": 3,
+            "away_score": 3,
+            "match_date": "2022-12-18",
+            "competition": "FIFA World Cup",
+            "season": "2022",
+            "note": "AET — Argentina won 4-2 on penalties",
+
+        },
+        {
+            "match_id": 8658,
+            "home_team": "France",
+            "away_team": "Croatia",
+            "home_score": 4,
+            "away_score": 2,
+            "match_date": "2018-07-15",
+            "competition": "FIFA World Cup",
+            "season": "2018",
+        },
     ]
     return {"matches": matches}
-
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
@@ -131,8 +152,7 @@ def chat(request: ChatRequest):
         elif match_ctx:
             question = f"Regarding the match {match_ctx}: {question}."
 
-        answer = rag_query(question, request.history or [])
-
+        answer = rag_query(question, request.history or [], match_id=request.match_id)
         return ChatResponse(
             answer=answer,
             question=request.question,

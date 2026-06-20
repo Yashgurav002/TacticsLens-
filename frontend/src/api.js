@@ -8,10 +8,11 @@ export const getMatches = async () => {
   return res.data.matches
 }
 
-export const askQuestion = async (question, matchContext = null, history = []) => {
+export const askQuestion = async (question, matchContext = null, history = [], matchId = null) => {
   const res = await axios.post(`${BASE_URL}/chat`, {
     question,
     match_context: matchContext,
+    match_id: matchId ? String(matchId) : null,
     history,
   })
   return res.data

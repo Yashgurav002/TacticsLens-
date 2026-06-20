@@ -50,8 +50,14 @@ export default function App() {
         content: m.content,
       }))
 
-      const data = await askQuestion(question, matchContext, history)
+      const data = await askQuestion(
+  question,
+  matchContext,
+  history,
+  selectedMatch?.match_id
+)
       setMessages(prev => [...prev, { role: 'assistant', content: data.answer }])
+    // eslint-disable-next-line no-unused-vars
     } catch (err) {
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -99,8 +105,9 @@ export default function App() {
                 {match.home_team} vs {match.away_team}
               </p>
               <p style={styles.matchScore}>
-                {match.home_score} - {match.away_score}
-              </p>
+    {match.home_score} - {match.away_score}
+    {match.note && <span style={{fontSize: '10px', color: '#4a5568', display: 'block'}}>{match.note}</span>}
+</p>
               <p style={styles.matchMeta}>
                 {match.competition} · {match.match_date}
               </p>

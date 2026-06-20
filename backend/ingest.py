@@ -288,7 +288,13 @@ def create_match_summary(match_info: dict, events: list[dict]) -> Document:
     elif away_score > home_score:
         winner = away_team
     else:
-        winner = "Draw"
+        winner = f"Draw after 120 minutes (went to penalties)"
+
+    # Penalty shootout winners — hardcoded since StatsBomb doesn't track shootout result
+    penalty_winners = {
+        "3869685": "Argentina won on penalties (4-2)",
+    }
+    penalty_note = penalty_winners.get(str(match_id), "")
 
     content = f"""Match Summary: Goals scored, shots, passes, cards, tackles, dribbles, lineups and full statistics for {home_team} vs {away_team}.
 Who scored goals in this match. Who assisted the goals. Final score and scorers. Starting 11 lineup for both teams. Top performers and player statistics.
@@ -299,7 +305,7 @@ Date: {match_date}
 Home Team: {home_team}
 Away Team: {away_team}
 Final Score: {home_team} {home_score} - {away_score} {away_team}
-Winner: {winner}
+Winner: {winner}{f" — {penalty_note}" if penalty_note else ""}
 
 STARTING LINEUPS:
   {home_team}: {home_lineup_text}
@@ -529,29 +535,50 @@ def store_in_chroma(chunks: list[Document]):
 # MAIN
 # ------------------------------------------------
 def run_ingestion():
-    COMPETITION_ID = 11
-    SEASON_ID = 42
-
-    all_matches = load_matches(COMPETITION_ID, SEASON_ID)
-    selected_matches = all_matches[:3]
     all_chunks = []
 
-    for match in selected_matches:
+    # ---- La Liga 2019/2020 matches ----
+    print("\n=== La Liga Matches ===")
+    la_liga_matches = load_matches(11, 42)
+    for match in la_liga_matches[:3]:
         match_id = match["match_id"]
         home = match["home_team"]["home_team_name"]
         away = match["away_team"]["away_team_name"]
         print(f"\nProcessing: {home} vs {away} (match_id: {match_id})")
-
         events = load_events(match_id)
         print(f"  Loaded {len(events)} events")
-
         summary = create_match_summary(match, events)
         all_chunks.append(summary)
         print(f"  Created match summary chunk")
-
         documents = events_to_documents(match, events)
         print(f"  Created {len(documents)} player documents")
+        chunks = split_documents(documents)
+        all_chunks.extend(chunks)
 
+    # ---- World Cup Finals ----
+    print("\n=== World Cup Finals ===")
+    wc_targets = [
+        (43, 106, 3869685),  # WC 2022 Final — Argentina vs France
+        (43, 3, 8658),       # WC 2018 Final — France vs Croatia
+    ]
+
+    for comp_id, season_id, target_match_id in wc_targets:
+        all_matches = load_matches(comp_id, season_id)
+        match = next((m for m in all_matches if m["match_id"] == target_match_id), None)
+        if not match:
+            print(f"Match {target_match_id} not found!")
+            continue
+
+        home = match["home_team"]["home_team_name"]
+        away = match["away_team"]["away_team_name"]
+        print(f"\nProcessing: {home} vs {away} (match_id: {target_match_id})")
+        events = load_events(target_match_id)
+        print(f"  Loaded {len(events)} events")
+        summary = create_match_summary(match, events)
+        all_chunks.append(summary)
+        print(f"  Created match summary chunk")
+        documents = events_to_documents(match, events)
+        print(f"  Created {len(documents)} player documents")
         chunks = split_documents(documents)
         all_chunks.extend(chunks)
 
@@ -563,7 +590,6 @@ def run_ingestion():
 
     store_in_chroma(all_chunks)
     print("\nIngestion complete!")
-
 
 if __name__ == "__main__":
     run_ingestion()

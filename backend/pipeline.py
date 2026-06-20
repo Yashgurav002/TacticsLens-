@@ -126,16 +126,50 @@ def build_rag_chain():
 # ------------------------------------------------
 # STEP 7 — Query function (used by FastAPI later)
 # ------------------------------------------------
-def query(question: str, history: list[dict] = []) -> str:
+def query(question: str, history: list[dict] = [], match_id: str = None) -> str:
     vectorstore = get_vectorstore()
-    retriever = vectorstore.as_retriever(
-        search_type="mmr",
-        search_kwargs={"k": TOP_K, "fetch_k": 20, "lambda_mult": 0.7},
-    )
     llm = get_llm()
     prompt = get_prompt()
 
-    # Format history as readable text
+    # ---- Step 1: Always fetch the match summary chunk first ----
+    summary_docs = []
+    if match_id:
+        try:
+            results = vectorstore.get(
+                where={
+                    "$and": [
+                        {"match_id": {"$eq": match_id}},
+                        {"event_type": {"$eq": "MATCH_SUMMARY"}}
+                    ]
+                }
+            )
+            if results and results.get("documents"):
+                from langchain_core.documents import Document
+                summary_docs = [
+                    Document(
+                        page_content=results["documents"][0],
+                        metadata=results["metadatas"][0],
+                    )
+                ]
+        except Exception as e:
+            print(f"Summary fetch error: {e}")
+
+    # ---- Step 2: Semantic search for remaining chunks ----
+    search_kwargs = {"k": 5, "fetch_k": 20, "lambda_mult": 0.7}
+    if match_id:
+        search_kwargs["filter"] = {"match_id": match_id}
+
+    retriever = vectorstore.as_retriever(
+        search_type="mmr",
+        search_kwargs=search_kwargs,
+    )
+    semantic_docs = retriever.invoke(question)
+
+    # ---- Step 3: Combine — summary always first ----
+    all_docs = summary_docs + semantic_docs
+    context = format_docs(all_docs)
+
+    # ---- Step 4: Format history ----
     history_text = ""
     if history:
         lines = []
@@ -144,9 +178,7 @@ def query(question: str, history: list[dict] = []) -> str:
             lines.append(f"{role}: {msg['content']}")
         history_text = "\n".join(lines)
 
-    docs = retriever.invoke(question)
-    context = format_docs(docs)
-
+    # ---- Step 5: Call LLM ----
     formatted = prompt.format_messages(
         context=context,
         question=question,
@@ -154,8 +186,6 @@ def query(question: str, history: list[dict] = []) -> str:
     )
     response = llm.invoke(formatted)
     return response.content
-
-
 # ------------------------------------------------
 # SANITY CHECK
 # Run: python pipeline.py
